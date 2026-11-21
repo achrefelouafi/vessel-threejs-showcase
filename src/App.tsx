@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import { VesselViewport, type VesselViewportHandle } from './three/VesselViewport';
 import { ControlPanel } from './components/ControlPanel';
+import { ContactCard } from './components/ContactCard';
 import { DirectorStage } from './director/DirectorStage';
 import {
   DEFAULT_VESSEL_PARAMS,
+  FINISH_PALETTES,
   type CameraPresetId,
   type LightingMood,
   type VesselParams,
@@ -267,6 +269,12 @@ export default function App() {
         onApplyPreset={handleApplyPreset}
         onReset={handleReset}
         onClose={() => setInspectorOpen(false)}
+      />
+
+      {/* Author / Profile & Open-Source Repo Card (Bottom-Right, synced to building accent) */}
+      <ContactCard
+        accent={FINISH_PALETTES[params.finishPreset].swatch}
+        hidden={uiHidden}
       />
     </div>
   );

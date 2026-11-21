@@ -269,6 +269,21 @@ export function DirectorStage({ autoplay = false }: { autoplay?: boolean }) {
       }),
     };
 
+    const wireMaterials: Record<MaterialBucket, THREE.MeshBasicMaterial> = {
+      copper: new THREE.MeshBasicMaterial({ color: '#f29e6d', wireframe: true }),
+      steel: new THREE.MeshBasicMaterial({ color: '#7e94b0', wireframe: true }),
+      concrete: new THREE.MeshBasicMaterial({ color: '#e8e2d8', wireframe: true }),
+      glass: new THREE.MeshBasicMaterial({
+        color: '#7fd9f5',
+        wireframe: true,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      }),
+      handrail: new THREE.MeshBasicMaterial({ color: '#ffd48a', wireframe: true }),
+      baseStone: new THREE.MeshBasicMaterial({ color: '#a39b90', wireframe: true }),
+    };
+
     const plazaMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color('#76787e'),
       map: plazaMaps.map,
@@ -489,7 +504,7 @@ export function DirectorStage({ autoplay = false }: { autoplay?: boolean }) {
         latestStats = result.stats;
       }
 
-      // 2. Materials & Wireframe
+      // 2. Materials & Clean CAD Wireframe Mode
       const pal = FINISH_PALETTES[p.finishPreset];
       materials.copper.color.set(pal.copperHex);
       materials.copper.roughness = p.copperRoughness;
@@ -498,9 +513,13 @@ export function DirectorStage({ autoplay = false }: { autoplay?: boolean }) {
       materials.steel.color.set(pal.steelHex);
       materials.concrete.color.set(pal.concreteHex);
       materials.glass.color.set(pal.glassHex);
-      Object.values(materials).forEach((m) => {
-        m.wireframe = p.wireframe;
-      });
+
+      const allBuckets: MaterialBucket[] = ['copper', 'steel', 'concrete', 'glass', 'handrail', 'baseStone'];
+      for (const b of allBuckets) {
+        meshes[b].material = p.wireframe ? wireMaterials[b] : materials[b];
+        meshes[b].castShadow = p.wireframe ? false : b !== 'glass';
+        meshes[b].receiveShadow = !p.wireframe;
+      }
 
       // 3. Environment / Sky / Lighting
       applyEnvironment(p);
@@ -563,6 +582,7 @@ export function DirectorStage({ autoplay = false }: { autoplay?: boolean }) {
         meshes[key].geometry.dispose();
       }
       Object.values(materials).forEach((m) => m.dispose());
+      Object.values(wireMaterials).forEach((m) => m.dispose());
       copperMaps.bumpMap.dispose();
       copperMaps.roughnessMap.dispose();
       concreteMaps.map.dispose();

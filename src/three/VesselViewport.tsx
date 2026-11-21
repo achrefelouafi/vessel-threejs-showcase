@@ -141,6 +141,7 @@ export const VesselViewport = forwardRef<VesselViewportHandle, VesselViewportPro
         handrail: THREE.MeshPhysicalMaterial;
         baseStone: THREE.MeshStandardMaterial;
       };
+      wireMaterials: Record<MaterialBucket, THREE.MeshBasicMaterial>;
       envRT: THREE.WebGLRenderTarget | null;
       camAnim: CameraAnim;
       updateEnvironment: (p: VesselParams) => void;
@@ -405,6 +406,22 @@ export const VesselViewport = forwardRef<VesselViewportHandle, VesselViewportPro
         }),
       };
 
+      // Dedicated luminous CAD blueprint wireframe materials (avoids dark metallic PBR + shadow-acne blackness!)
+      const wireMaterials: Record<MaterialBucket, THREE.MeshBasicMaterial> = {
+        copper: new THREE.MeshBasicMaterial({ color: '#f29e6d', wireframe: true }),
+        steel: new THREE.MeshBasicMaterial({ color: '#7d92ad', wireframe: true }),
+        concrete: new THREE.MeshBasicMaterial({ color: '#e5dfd5', wireframe: true }),
+        glass: new THREE.MeshBasicMaterial({
+          color: '#7ad4ef',
+          wireframe: true,
+          transparent: true,
+          opacity: 0.55,
+          depthWrite: false,
+        }),
+        handrail: new THREE.MeshBasicMaterial({ color: '#ffd285', wireframe: true }),
+        baseStone: new THREE.MeshBasicMaterial({ color: '#9d9489', wireframe: true }),
+      };
+
       // Hudson Yards Architectural Plaza Ground Plane
       const plazaMat = new THREE.MeshStandardMaterial({
         color: new THREE.Color('#7a7c82'),
@@ -631,6 +648,7 @@ export const VesselViewport = forwardRef<VesselViewportHandle, VesselViewportPro
         vesselGroup,
         meshes,
         materials,
+        wireMaterials,
         envRT: null,
         camAnim: {
           active: false,
@@ -712,6 +730,7 @@ export const VesselViewport = forwardRef<VesselViewportHandle, VesselViewportPro
           meshes[key].geometry.dispose();
         }
         Object.values(materials).forEach((m) => m.dispose());
+        Object.values(wireMaterials).forEach((m) => m.dispose());
         copperMaps.bumpMap.dispose();
         copperMaps.roughnessMap.dispose();
         concreteMaps.map.dispose();
@@ -805,7 +824,7 @@ export const VesselViewport = forwardRef<VesselViewportHandle, VesselViewportPro
     ]);
 
     // =========================================================================
-    // LIVE MATERIAL FINISH & WIREFRAME UPDATES
+    // LIVE MATERIAL FINISH & CLEAN CAD WIREFRAME MODE UPDATES
     // =========================================================================
     useEffect(() => {
       const ctx = threeRef.current;
@@ -820,14 +839,53 @@ export const VesselViewport = forwardRef<VesselViewportHandle, VesselViewportPro
       ctx.materials.concrete.color.set(pal.concreteHex);
       ctx.materials.glass.color.set(pal.glassHex);
 
-      Object.values(ctx.materials).forEach((m) => {
-        m.wireframe = params.wireframe;
-      });
+      // Adapt crisp CAD wireframe palette to lighting mood (dark lines on bright Studio, luminous lines elsewhere!)
+      const isStudio = params.lightingMood === 'studio';
+      const accentWire = new THREE.Color(pal.copperHex);
+      if (isStudio) {
+        accentWire.lerp(new THREE.Color('#4a2610'), 0.25);
+        ctx.wireMaterials.copper.color.copy(accentWire);
+        ctx.wireMaterials.steel.color.set('#333e4f');
+        ctx.wireMaterials.concrete.color.set('#5e6672');
+        ctx.wireMaterials.glass.color.set('#277996');
+        ctx.wireMaterials.handrail.color.set('#9e6424');
+        ctx.wireMaterials.baseStone.color.set('#4c515a');
+      } else {
+        accentWire.lerp(new THREE.Color('#ffd3b3'), 0.36);
+        ctx.wireMaterials.copper.color.copy(accentWire);
+        ctx.wireMaterials.steel.color.set('#7e94b0');
+        ctx.wireMaterials.concrete.color.set('#e8e2d8');
+        ctx.wireMaterials.glass.color.set('#7fd9f5');
+        ctx.wireMaterials.handrail.color.set('#ffd48a');
+        ctx.wireMaterials.baseStone.color.set('#a39b90');
+      }
+
+      const buckets: MaterialBucket[] = [
+        'copper',
+        'steel',
+        'concrete',
+        'glass',
+        'handrail',
+        'baseStone',
+      ];
+      for (const b of buckets) {
+        const mesh = ctx.meshes[b];
+        if (params.wireframe) {
+          mesh.material = ctx.wireMaterials[b];
+          mesh.castShadow = false;
+          mesh.receiveShadow = false;
+        } else {
+          mesh.material = ctx.materials[b];
+          mesh.castShadow = b !== 'glass';
+          mesh.receiveShadow = true;
+        }
+      }
     }, [
       params.finishPreset,
       params.copperRoughness,
       params.copperMetalness,
       params.wireframe,
+      params.lightingMood,
     ]);
 
     // =========================================================================
